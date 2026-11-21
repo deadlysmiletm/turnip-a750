@@ -1,0 +1,17 @@
+diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
+index 5babdee..007a759 100644
+--- a/src/freedreno/vulkan/tu_image.cc
++++ b/src/freedreno/vulkan/tu_image.cc
+@@ -388,6 +388,12 @@ ubwc_possible(struct tu_device *device,
+       return false;
+    }
+ 
++   /* turnip-a750: UBWC on MSAA render targets causes periodic GPU hangs
++    * (adreno-gen7-gmu) in Switch emulation. Costs some bandwidth on MSAA only.
++    */
++   if (samples > VK_SAMPLE_COUNT_1_BIT)
++      return false;
++
+    /* A690 seem to have broken UBWC for depth/stencil, it requires
+     * depth flushing where we cannot realistically place it, like between
+     * ordinary draw calls writing read/depth. WSL blob seem to use ubwc

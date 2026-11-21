@@ -6,6 +6,10 @@ on:
       mesa_ref:
         description: Mesa branch or tag (main = latest)
         default: main
+      patches:
+        description: Apply patches/ (off = stock Mesa baseline)
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -20,8 +24,16 @@ jobs:
           sudo apt-get install -y ninja-build glslang-tools flex bison patchelf zip
           pip install --break-system-packages meson mako pyyaml packaging
 
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+
       - name: Get Mesa
         run: git clone --depth 1 --branch "${{ inputs.mesa_ref }}" https://gitlab.freedesktop.org/mesa/mesa.git
+
+      - name: Apply patches
+        if: inputs.patches
+        run: for p in repo/patches/*.patch; do echo "== $p"; git -C mesa apply "../$p"; done
 
       - name: Cross file
         run: |
@@ -63,6 +75,7 @@ jobs:
       - name: Package for AdrenoTools
         run: |
           VER="$(cat mesa/VERSION)-$(git -C mesa rev-parse --short HEAD)"
+          [ "${{ inputs.patches }}" = "true" ] || VER="$VER-stock"
           echo "VER=$VER" >> "$GITHUB_ENV"
           mkdir pkg
           cp mesa/build/src/freedreno/vulkan/libvulkan_freedreno.so pkg/vulkan.ad07XX.so
