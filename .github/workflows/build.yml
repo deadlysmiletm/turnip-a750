@@ -1,0 +1,89 @@
+name: Build Turnip (Adreno 750)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mesa_ref:
+        description: Mesa branch or tag (main = latest)
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build glslang-tools flex bison patchelf zip
+          pip install --break-system-packages meson mako pyyaml packaging
+
+      - name: Get Mesa
+        run: git clone --depth 1 --branch "${{ inputs.mesa_ref }}" https://gitlab.freedesktop.org/mesa/mesa.git
+
+      - name: Cross file
+        run: |
+          # ponytail: NDK comes preinstalled on the runner, no download
+          BIN="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          cat > android-aarch64.ini <<EOF
+          [binaries]
+          ar = '$BIN/llvm-ar'
+          c = ['$BIN/aarch64-linux-android34-clang']
+          cpp = ['$BIN/aarch64-linux-android34-clang++', '-fno-exceptions', '-fno-unwind-tables', '-fno-asynchronous-unwind-tables', '-static-libstdc++']
+          c_ld = 'lld'
+          cpp_ld = 'lld'
+          strip = '$BIN/llvm-strip'
+          pkg-config = ['/usr/bin/pkg-config']
+
+          [built-in options]
+          # ponytail: tuned for SD 8 Gen 3 (X4/A720/A520, all ARMv9.2). Use armv8.2-a if you share it with older phones
+          c_args = ['-mcpu=cortex-x4']
+          cpp_args = ['-mcpu=cortex-x4']
+
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'armv8'
+          endian = 'little'
+          EOF
+
+      - name: Build
+        working-directory: mesa
+        run: |
+          meson setup build --cross-file ../android-aarch64.ini \
+            -Dbuildtype=release -Db_lto=true \
+            -Dplatforms=android -Dplatform-sdk-version=34 \
+            -Dandroid-stub=true -Dandroid-libbacktrace=disabled \
+            -Dgallium-drivers= -Dvulkan-drivers=freedreno \
+            -Dfreedreno-kmds=kgsl -Dvulkan-beta=true
+          ninja -C build src/freedreno/vulkan/libvulkan_freedreno.so
+
+      - name: Package for AdrenoTools
+        run: |
+          VER="$(cat mesa/VERSION)-$(git -C mesa rev-parse --short HEAD)"
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          mkdir pkg
+          cp mesa/build/src/freedreno/vulkan/libvulkan_freedreno.so pkg/vulkan.ad07XX.so
+          "$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" pkg/vulkan.ad07XX.so
+          patchelf --set-soname vulkan.adreno.so pkg/vulkan.ad07XX.so
+          cat > pkg/meta.json <<EOF
+          {
+            "schemaVersion": 1,
+            "name": "Turnip A750 $VER",
+            "description": "Mesa Turnip built for Snapdragon 8 Gen 3 / Adreno 750",
+            "author": "turnip-a750",
+            "packageVersion": "1",
+            "vendor": "Mesa",
+            "driverVersion": "$VER",
+            "minApi": 28,
+            "libraryName": "vulkan.ad07XX.so"
+          }
+          EOF
+          cd pkg && zip ../turnip-a750-$VER.zip *
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VER" "turnip-a750-$VER.zip" -R "$GITHUB_REPOSITORY" --title "Turnip A750 $VER" --notes "Mesa ${{ inputs.mesa_ref }} @ $VER"
