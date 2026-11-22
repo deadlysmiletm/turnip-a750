@@ -1,0 +1,17 @@
+diff --git a/src/freedreno/vulkan/tu_cmd_buffer.cc b/src/freedreno/vulkan/tu_cmd_buffer.cc
+index e9c7454..b487a5b 100644
+--- a/src/freedreno/vulkan/tu_cmd_buffer.cc
++++ b/src/freedreno/vulkan/tu_cmd_buffer.cc
+@@ -2173,7 +2173,11 @@ tu6_init_static_regs(struct tu_device *dev, struct tu_cs *cs)
+ {
+    const struct tu_physical_device *phys_dev = dev->physical_device;
+ 
+-   if (CHIP == A7XX) {
++   /* turnip-a750: downstream KGSL protects RB_CCU_CNTL on gen7. The write is
++    * rejected anyway and raises a CP AHB bus error per submit
++    * ("CP: AHB bus error, CP_RL_ERROR_DETAILS_0:0x10008e07"), so skip it.
++    */
++   if (CHIP == A7XX && strcmp(phys_dev->instance->knl->name, "kgsl") != 0) {
+       /* On A7XX, RB_CCU_CNTL was broken into two registers, RB_CCU_CNTL which has
+        * static properties that can be set once, this requires a WFI to take effect.
+        * While the newly introduced register RB_CCU_CACHE_CNTL has properties that may
