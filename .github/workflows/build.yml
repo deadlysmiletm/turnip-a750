@@ -82,9 +82,9 @@ jobs:
           [ "${{ inputs.patches }}" = "true" ] || VER="$VER-stock"
           echo "VER=$VER" >> "$GITHUB_ENV"
           mkdir pkg
-          cp mesa/build/src/freedreno/vulkan/libvulkan_freedreno.so pkg/vulkan.ad07XX.so
-          "$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" pkg/vulkan.ad07XX.so
-          patchelf --set-soname vulkan.adreno.so pkg/vulkan.ad07XX.so
+          cp mesa/build/src/freedreno/vulkan/libvulkan_freedreno.so pkg/vulkan.ad07xx.so
+          "$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" pkg/vulkan.ad07xx.so
+          patchelf --set-soname vulkan.adreno.so pkg/vulkan.ad07xx.so
           cat > pkg/meta.json <<EOF
           {
             "schemaVersion": 1,
@@ -94,8 +94,8 @@ jobs:
             "packageVersion": "1",
             "vendor": "Mesa",
             "driverVersion": "$VER",
-            "minApi": 28,
-            "libraryName": "vulkan.ad07XX.so"
+            "minApi": 27,
+            "libraryName": "vulkan.ad07xx.so"
           }
           EOF
           cd pkg && zip ../turnip-a750-$VER.zip *
