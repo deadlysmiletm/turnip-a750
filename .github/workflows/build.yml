@@ -47,7 +47,8 @@ jobs:
           c_ld = 'lld'
           cpp_ld = 'lld'
           strip = '$BIN/llvm-strip'
-          pkg-config = ['/usr/bin/pkg-config']
+          # ponytail: no host pkg-config, x86 libs (zstd, spirv-tools...) were leaking into the Android build
+          pkg-config = 'false'
 
           [built-in options]
           # ponytail: tuned for SD 8 Gen 3 (X4/A720/A520, all ARMv9.2). Use armv8.2-a if you share it with older phones
