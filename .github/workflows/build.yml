@@ -43,7 +43,7 @@ jobs:
           [binaries]
           ar = '$BIN/llvm-ar'
           c = ['$BIN/aarch64-linux-android34-clang']
-          cpp = ['$BIN/aarch64-linux-android34-clang++', '-fno-exceptions', '-fno-unwind-tables', '-fno-asynchronous-unwind-tables', '-static-libstdc++']
+          cpp = ['$BIN/aarch64-linux-android34-clang++', '-fno-exceptions', '-fno-unwind-tables', '-fno-asynchronous-unwind-tables']
           c_ld = 'lld'
           cpp_ld = 'lld'
           strip = '$BIN/llvm-strip'
@@ -53,6 +53,7 @@ jobs:
           # ponytail: tuned for SD 8 Gen 3 (X4/A720/A520, all ARMv9.2). Use armv8.2-a if you share it with older phones
           c_args = ['-mcpu=cortex-x4']
           cpp_args = ['-mcpu=cortex-x4']
+          cpp_link_args = ['-static-libstdc++']
 
           [host_machine]
           system = 'android'
@@ -69,7 +70,8 @@ jobs:
             -Dplatforms=android -Dplatform-sdk-version=34 \
             -Dandroid-stub=true -Dandroid-libbacktrace=disabled \
             -Dgallium-drivers= -Dvulkan-drivers=freedreno \
-            -Dfreedreno-kmds=kgsl -Dvulkan-beta=true
+            -Dfreedreno-kmds=kgsl -Dvulkan-beta=true \
+            -Dopengl=false -Degl=disabled -Dgles1=disabled -Dgles2=disabled -Dglx=disabled
           ninja -C build src/freedreno/vulkan/libvulkan_freedreno.so
 
       - name: Package for AdrenoTools
