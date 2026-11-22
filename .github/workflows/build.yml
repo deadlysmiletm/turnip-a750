@@ -80,6 +80,7 @@ jobs:
         run: |
           VER="$(cat mesa/VERSION)-$(git -C mesa rev-parse --short HEAD)"
           [ "${{ inputs.patches }}" = "true" ] || VER="$VER-stock"
+          VER="$VER-r${{ github.run_number }}"  # ponytail: unique tag when Mesa hasn't moved between builds
           echo "VER=$VER" >> "$GITHUB_ENV"
           mkdir pkg
           cp mesa/build/src/freedreno/vulkan/libvulkan_freedreno.so pkg/vulkan.ad07xx.so
