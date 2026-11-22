@@ -1,17 +1,40 @@
 diff --git a/src/freedreno/vulkan/tu_cmd_buffer.cc b/src/freedreno/vulkan/tu_cmd_buffer.cc
-index e9c7454..b487a5b 100644
+index e9c7454..58efd51 100644
 --- a/src/freedreno/vulkan/tu_cmd_buffer.cc
 +++ b/src/freedreno/vulkan/tu_cmd_buffer.cc
-@@ -2173,7 +2173,11 @@ tu6_init_static_regs(struct tu_device *dev, struct tu_cs *cs)
+@@ -2173,7 +2173,15 @@ tu6_init_static_regs(struct tu_device *dev, struct tu_cs *cs)
  {
     const struct tu_physical_device *phys_dev = dev->physical_device;
  
 -   if (CHIP == A7XX) {
-+   /* turnip-a750: downstream KGSL protects RB_CCU_CNTL on gen7. The write is
-+    * rejected anyway and raises a CP AHB bus error per submit
-+    * ("CP: AHB bus error, CP_RL_ERROR_DETAILS_0:0x10008e07"), so skip it.
++   /* turnip-a750: recent downstream KGSL programs the RB 0x8e00-0x8e0f block
++    * itself on gen7 and blocks UMD writes (like upstream does on gen8+). The
++    * writes are rejected anyway and raise a CP AHB bus error per submit
++    * ("CP: AHB bus error, CP_RL_ERROR_DETAILS_0:0x10008e0x"), so skip them.
 +    */
-+   if (CHIP == A7XX && strcmp(phys_dev->instance->knl->name, "kgsl") != 0) {
++   const bool kmd_owns_rb_8e0x = CHIP == A7XX &&
++      strcmp(phys_dev->instance->knl->name, "kgsl") == 0;
++
++   if (CHIP == A7XX && !kmd_owns_rb_8e0x) {
        /* On A7XX, RB_CCU_CNTL was broken into two registers, RB_CCU_CNTL which has
         * static properties that can be set once, this requires a WFI to take effect.
         * While the newly introduced register RB_CCU_CACHE_CNTL has properties that may
+@@ -2202,6 +2210,9 @@ tu6_init_static_regs(struct tu_device *dev, struct tu_cs *cs)
+       if (!magic_reg.reg)
+          break;
+ 
++      if (kmd_owns_rb_8e0x && magic_reg.reg >= 0x8e00 && magic_reg.reg <= 0x8e0f)
++         continue;
++
+       uint32_t value = magic_reg.value;
+       switch(magic_reg.reg) {
+          case REG_A6XX_TPL1_DBG_ECO_CNTL:
+@@ -2318,7 +2329,7 @@ tu6_init_static_regs(struct tu_device *dev, struct tu_cs *cs)
+ 
+    /* BR-only registers */
+    /* non-ctx regs programmed by KMD (and blocked from UMD) on gen8+ */
+-   if (CHIP < A8XX) {
++   if (CHIP < A8XX && !kmd_owns_rb_8e0x) {
+       if (CHIP == A7XX)
+          tu_cond_exec_start(cs, CP_COND_REG_EXEC_0_MODE(THREAD_MODE) |
+                               CP_COND_REG_EXEC_0_BR);
