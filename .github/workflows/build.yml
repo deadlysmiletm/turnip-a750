@@ -71,7 +71,8 @@ jobs:
             -Dandroid-stub=true -Dandroid-libbacktrace=disabled \
             -Dgallium-drivers= -Dvulkan-drivers=freedreno \
             -Dfreedreno-kmds=kgsl -Dvulkan-beta=true \
-            -Dopengl=false -Degl=disabled -Dgles1=disabled -Dgles2=disabled -Dglx=disabled
+            -Dopengl=false -Degl=disabled -Dgles1=disabled -Dgles2=disabled -Dglx=disabled \
+            -Dzstd=disabled
           ninja -C build src/freedreno/vulkan/libvulkan_freedreno.so
 
       - name: Package for AdrenoTools
