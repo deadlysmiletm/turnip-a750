@@ -51,9 +51,9 @@ jobs:
           pkg-config = 'false'
 
           [built-in options]
-          # ponytail: tuned for SD 8 Gen 3 (X4/A720/A520, all ARMv9.2). Use armv8.2-a if you share it with older phones
-          c_args = ['-mcpu=cortex-x4']
-          cpp_args = ['-mcpu=cortex-x4']
+          # ponytail: SD 8 Gen 3 features only (no SVE: Qualcomm disables it, SVE = instant SIGILL)
+          c_args = ['-march=armv8.6-a+dotprod+i8mm+bf16', '-mtune=cortex-x4']
+          cpp_args = ['-march=armv8.6-a+dotprod+i8mm+bf16', '-mtune=cortex-x4']
           cpp_link_args = ['-static-libstdc++']
 
           [host_machine]
