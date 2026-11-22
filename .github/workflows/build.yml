@@ -65,7 +65,7 @@ jobs:
         working-directory: mesa
         run: |
           meson setup build --cross-file ../android-aarch64.ini \
-            -Dbuildtype=release -Db_lto=true \
+            -Dbuildtype=release \
             -Dplatforms=android -Dplatform-sdk-version=34 \
             -Dandroid-stub=true -Dandroid-libbacktrace=disabled \
             -Dgallium-drivers= -Dvulkan-drivers=freedreno \
