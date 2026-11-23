@@ -70,6 +70,7 @@ jobs:
             -Dbuildtype=release \
             -Dplatforms=android -Dplatform-sdk-version=34 \
             -Dandroid-stub=true -Dandroid-libbacktrace=disabled \
+            -Dandroid-strict=false \
             -Dgallium-drivers= -Dvulkan-drivers=freedreno \
             -Dfreedreno-kmds=kgsl -Dvulkan-beta=true \
             -Dopengl=false -Degl=disabled -Dgles1=disabled -Dgles2=disabled -Dglx=disabled \
