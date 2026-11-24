@@ -36,7 +36,7 @@ jobs:
           for dll in libarm64ecfex.dll libwow64fex.dll; do
             [ -n "$(find "p/$NEW" -name "$dll")" ] || { echo "no $dll in proton"; exit 1; }
             find "p/$NEW" -name "$dll" | while read -r f; do
-              echo "$f: $(grep -aoE 'FEX-[0-9]{4}[^ ]{0,30}' "$f" | head -1) -> GN"; cp "fex/system32/$dll" "$f"
+              echo "$f: $(grep -aoE 'FEX-[0-9]{4}[^ ]{0,30}' "$f" | head -1) -> GN"; chmod u+w "$f"; cp "fex/system32/$dll" "$f"
             done
           done
           sed -i "s/\"$TOP\"/\"$NEW\"/g" "p/$NEW/compatibilitytool.vdf" || true
