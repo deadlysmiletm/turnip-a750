@@ -31,12 +31,13 @@ jobs:
         id: swap
         run: |
           set -e
-          TOP=$(ls p); NEW="$TOP-gnfex-${{ inputs.gn_tag }}"
+          TOP=$(ls p); NEW="${TOP// /-}-gnfex-${{ inputs.gn_tag }}"
           mv "p/$TOP" "p/$NEW"
           for dll in libarm64ecfex.dll libwow64fex.dll; do
-            hits=$(find "p/$NEW" -name "$dll")
-            [ -n "$hits" ] || { echo "no $dll in proton"; exit 1; }
-            for f in $hits; do echo "$f: $(grep -aoE 'FEX-[0-9]{4}[^ ]{0,30}' "$f" | head -1) -> GN"; cp "fex/system32/$dll" "$f"; done
+            [ -n "$(find "p/$NEW" -name "$dll")" ] || { echo "no $dll in proton"; exit 1; }
+            find "p/$NEW" -name "$dll" | while read -r f; do
+              echo "$f: $(grep -aoE 'FEX-[0-9]{4}[^ ]{0,30}' "$f" | head -1) -> GN"; cp "fex/system32/$dll" "$f"
+            done
           done
           sed -i "s/\"$TOP\"/\"$NEW\"/g" "p/$NEW/compatibilitytool.vdf" || true
           tar -C p -czf "$NEW-aarch64.tar.gz" "$NEW"
