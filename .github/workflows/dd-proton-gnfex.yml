@@ -1,0 +1,51 @@
+name: DroidDeck Proton + GameNative FEX
+
+# DroidDeck-Proton with its ARM64EC/WoW64 FEX DLLs swapped for GameNative's FEX build.
+# Both pair with the same ntdll export patch (BTCpu64NotifyNonImageViews), so the DLLs drop in.
+# Output tar.gz installs from DroidDeck's Experimental Proton "install from file".
+on:
+  workflow_dispatch:
+    inputs:
+      dd_tag:
+        description: Droid-Deck/DroidDeck-Proton release tag
+        default: DroidDeck-Proton-11-12.8
+      gn_tag:
+        description: GameNative/FEX release tag
+        default: gn-7
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ inputs.dd_tag }}" -R Droid-Deck/DroidDeck-Proton -p '*-aarch64.tar.gz'
+          gh release download "${{ inputs.gn_tag }}" -R GameNative/FEX -p '*.wcp'
+          mkdir fex && xz -dc *.wcp | tar -x -C fex
+          mkdir p && tar -C p -xzf *-aarch64.tar.gz
+      - name: Swap FEX
+        id: swap
+        run: |
+          set -e
+          TOP=$(ls p); NEW="$TOP-gnfex-${{ inputs.gn_tag }}"
+          mv "p/$TOP" "p/$NEW"
+          for dll in libarm64ecfex.dll libwow64fex.dll; do
+            hits=$(find "p/$NEW" -name "$dll")
+            [ -n "$hits" ] || { echo "no $dll in proton"; exit 1; }
+            for f in $hits; do echo "$f: $(grep -aoE 'FEX-[0-9]{4}[^ ]{0,30}' "$f" | head -1) -> GN"; cp "fex/system32/$dll" "$f"; done
+          done
+          sed -i "s/\"$TOP\"/\"$NEW\"/g" "p/$NEW/compatibilitytool.vdf" || true
+          tar -C p -czf "$NEW-aarch64.tar.gz" "$NEW"
+          ls -la "$NEW-aarch64.tar.gz"
+          echo "name=$NEW" >> "$GITHUB_OUTPUT"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.swap.outputs.name }}" "${{ steps.swap.outputs.name }}-aarch64.tar.gz" -R "$GITHUB_REPOSITORY" \
+            --title "${{ steps.swap.outputs.name }}" \
+            --notes "${{ inputs.dd_tag }} with libarm64ecfex.dll and libwow64fex.dll from GameNative/FEX ${{ inputs.gn_tag }}. Install from DroidDeck's Experimental Proton (install from file)."
