@@ -1,0 +1,91 @@
+name: DroidDeck Linux build
+
+# Linux (glibc) Turnip for DroidDeck: Droid-Deck/Drivers' own recipe and patch series, plus our patches on top.
+# Output zip = one libvulkan_freedreno.so + meta.json, importable from DroidDeck's driver manager.
+on:
+  workflow_dispatch:
+    inputs:
+      dd_ref:
+        description: Droid-Deck/Drivers recipe ref (default = DD-Turnip v0.9.1)
+        default: ac34abe1406645fe18e12db9fe3102ebd2c637d2
+      mesa_ref:
+        description: Mesa commit (default = DD-Turnip v0.9.1)
+        default: 0c418c5054a1223668c73614227c5f4cb67addaf
+      patches:
+        description: Our patches from patches/ to add, space-separated (empty = DD stock rebuild)
+        default: 0002-kgsl-skip-protected-ccu-cntl.patch
+        required: false
+      tag:
+        description: Release suffix
+        default: r1
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/checkout@v4
+        with:
+          repository: Droid-Deck/Drivers
+          ref: ${{ inputs.dd_ref }}
+          path: dd
+      - name: Host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ninja-build flex bison glslang-tools pkg-config python3-pip \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu libwayland-dev zip
+          sudo python3 -m pip install --break-system-packages --quiet 'meson>=1.5' mako pyyaml packaging
+      - name: Add our patches to DD's linux series
+        env:
+          PATCHES: ${{ inputs.patches }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, shutil
+          s = 'dd/patches/series.json'; series = json.load(open(s))
+          for p in os.environ['PATCHES'].split():
+              shutil.copy(f'repo/patches/{p}', f'dd/patches/a750-{p}')
+              series.append({'file': f'a750-{p}', 'targets': ['linux'], 'summary': f'turnip-a750: {p}'})
+          json.dump(series, open(s, 'w'), indent=2)
+          print([e['file'] for e in series if 'linux' in e['targets']])
+          EOF
+      - name: Mesa
+        run: dd/scripts/fetch_mesa.sh dd/work/mesa-src "${{ inputs.mesa_ref }}"
+      - name: Build
+        run: dd/scripts/build_linux.sh dd/work/mesa-src
+      - name: Package
+        id: pkg
+        env:
+          PATCHES: ${{ inputs.patches }}
+        run: |
+          MESA=$(cut -c1-10 dd/out/linux/mesa-commit)
+          TAG="dd-linux-${MESA}-${{ inputs.tag }}"
+          mkdir -p pkg
+          cp dd/out/linux/libvulkan_freedreno.so pkg/
+          SHA=$(sha256sum pkg/libvulkan_freedreno.so | cut -d' ' -f1)
+          # displayBuffers: DD's linux_gralloc_exports patch is in the series, same as DD-Turnip
+          cat > pkg/meta.json <<EOF
+          {"schemaVersion":1,"kind":"linux-vulkan-icd","name":"turnip-a750 $TAG","driverVersion":"$TAG",
+           "description":"DD-Turnip recipe ${{ inputs.dd_ref }} + turnip-a750 patches: ${PATCHES:-none}",
+           "platform":"linux","architecture":"aarch64","libc":"glibc","displayBuffers":true,
+           "libraryName":"libvulkan_freedreno.so","mesaCommit":"$(cat dd/out/linux/mesa-commit)","librarySha256":"$SHA"}
+          EOF
+          (cd pkg && zip -q "../turnip-a750-$TAG.zip" libvulkan_freedreno.so meta.json)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: patch-log
+          path: dd/work/linux/patch.log
+          if-no-files-found: ignore
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.pkg.outputs.tag }}" "turnip-a750-${{ steps.pkg.outputs.tag }}.zip" -R "$GITHUB_REPOSITORY" \
+            --title "DroidDeck Linux ${{ steps.pkg.outputs.tag }}" \
+            --notes "Linux glibc Turnip for DroidDeck. DD-Turnip recipe ${{ inputs.dd_ref }}, Mesa ${{ inputs.mesa_ref }}, plus: ${{ inputs.patches || 'none (stock DD rebuild)' }}. Import the zip from DroidDeck's driver manager."
